@@ -1,0 +1,3 @@
+server:
+  bind_addr: ":9095"
+  log_level: "debug"

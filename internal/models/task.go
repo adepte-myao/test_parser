@@ -1,14 +1,14 @@
 package models
 
 type Task struct {
-	question string
-	options  []string
-	answer   string
-	isValid  bool
+	Question string
+	Options  []string
+	Answer   string
+	IsValid  bool
 }
 
 func NewTask() *Task {
 	return &Task{
-		isValid: false,
+		IsValid: false,
 	}
 }

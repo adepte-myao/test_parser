@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/adepte-myao/test_parser/internal/models"
 	"github.com/gorilla/mux"
 )
 
@@ -55,23 +56,23 @@ func handleFile(rw http.ResponseWriter, r *http.Request) {
 	tasks := parseHtml(dataStr)
 	rw.WriteHeader(http.StatusOK)
 	for _, task := range tasks {
-		rw.Write([]byte(task.question))
+		rw.Write([]byte(task.Question))
 
 		rw.Write([]byte("\n"))
-		for _, option := range task.options {
+		for _, option := range task.Options {
 			rw.Write([]byte("\t"))
 			rw.Write([]byte(option))
 			rw.Write([]byte("\n"))
 		}
 
 		rw.Write([]byte("\tRight answer: "))
-		rw.Write([]byte(task.answer))
+		rw.Write([]byte(task.Answer))
 
 		rw.Write([]byte("\n\n"))
 	}
 }
 
-func parseHtml(html string) []Task {
+func parseHtml(html string) []models.Task {
 	taskReg := regexp.MustCompile(`<div class="card flex-shrink-1 shadow">[[:print:][:cntrl:]А-Яа-я№«»]*?</div>`)
 	foundedQuestionsWithAnswers := taskReg.FindAllString(html, -1)
 
@@ -86,7 +87,7 @@ func parseHtml(html string) []Task {
 
 	extraSpacesReg := regexp.MustCompile(`\s+`)
 
-	tasks := make([]Task, 0)
+	tasks := make([]models.Task, 0)
 
 	for _, element := range foundedQuestionsWithAnswers {
 		question := questionReg.FindAllString(element, 1)[0]
@@ -113,10 +114,10 @@ func parseHtml(html string) []Task {
 		lastOpeningBraceInd := strings.LastIndex(answer, "<")
 		answer = answer[firstClosingBraceInd+1 : lastOpeningBraceInd]
 
-		task := NewTask()
-		task.question = question
-		task.options = options
-		task.answer = answer
+		task := models.NewTask()
+		task.Question = question
+		task.Options = options
+		task.Answer = answer
 		tasks = append(tasks, *task)
 	}
 

@@ -1,4 +1,4 @@
-module parser_example
+module github.com/adepte-myao/test_parser
 
 go 1.19
 

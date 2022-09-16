@@ -63,6 +63,8 @@ func (parser *Parser) parseQuestion(taskBlock string) string {
 	question := parser.questionBlockReg.FindAllString(taskBlock, 1)[0]
 	question = parser.excessQuestionSymbolsReg.ReplaceAllString(question, "")
 	question = parser.extraSpacesReg.ReplaceAllString(question, " ")
+
+	question = strings.TrimLeft(question, " ")
 	return question[:len(question)-1]
 }
 

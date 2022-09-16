@@ -6,27 +6,27 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"regexp"
-	"strings"
 	"time"
 
-	"github.com/adepte-myao/test_parser/internal/models"
+	"github.com/adepte-myao/test_parser/internal/html"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
 	http.Server
-	config *ServerConfig
-	logger *logrus.Logger
-	router mux.Router
+	config     *ServerConfig
+	logger     *logrus.Logger
+	router     *mux.Router
+	htmlParser *html.Parser
 }
 
 func NewServer(config *ServerConfig) *Server {
 	return &Server{
-		config: config,
-		logger: logrus.New(),
-		router: *mux.NewRouter(),
+		config:     config,
+		logger:     logrus.New(),
+		router:     mux.NewRouter(),
+		htmlParser: html.NewParser(),
 	}
 }
 
@@ -76,19 +76,19 @@ func (s *Server) configureLogger() error {
 }
 
 func (s *Server) configureRouter() {
-	s.router.HandleFunc("/", s.handleSimpleHmtl)
+	s.router.HandleFunc("/", s.handleHmtl)
 	s.router.HandleFunc("/file", s.handleFile)
 }
 
 func (s *Server) congfigureServer() {
 	s.Addr = s.config.BindAddr
-	s.Handler = &s.router
+	s.Handler = s.router
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
 	s.WriteTimeout = 3 * time.Second
 }
 
-func (s *Server) handleSimpleHmtl(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHmtl(rw http.ResponseWriter, r *http.Request) {
 	s.logger.Info("Received handle simple HTML request")
 
 	resp, err := http.Get("https://tests24.ru/?iter=3&test=726")
@@ -126,7 +126,8 @@ func (s *Server) handleFile(rw http.ResponseWriter, r *http.Request) {
 
 	dataStr := string(data)
 
-	tasks := parseHtml(dataStr)
+	tasks := s.htmlParser.ParseHtml(dataStr)
+
 	rw.WriteHeader(http.StatusOK)
 	for _, task := range tasks {
 		rw.Write([]byte(task.Question))
@@ -143,56 +144,4 @@ func (s *Server) handleFile(rw http.ResponseWriter, r *http.Request) {
 
 		rw.Write([]byte("\n\n"))
 	}
-}
-
-func parseHtml(html string) []models.Task {
-	taskReg := regexp.MustCompile(`<div class="card flex-shrink-1 shadow">[[:print:][:cntrl:]А-Яа-я№«»]*?</div>`)
-	foundedQuestionsWithAnswers := taskReg.FindAllString(html, -1)
-
-	questionReg := regexp.MustCompile(`[0-9]+\)</b>[[:print:][:cntrl:]А-Яа-я№«»]*?<`)
-	excessQuestionSymbolsReg := regexp.MustCompile(`[0-9]+\)</b>`)
-
-	optionsReg := regexp.MustCompile(`<span[[:print:][:cntrl:]А-Яа-я№«»]*?</span>`)
-	excessOptionsSymbolsReg := regexp.MustCompile(`<b>|</b>|<span[[:print:][:cntrl:]]*?>|</span>|[0-9]+\) `)
-
-	answerReg := regexp.MustCompile(`color:#3ea82e[[:print:][:cntrl:]А-Яа-я№«»]*?</span>`)
-	excessAnswerSymbolsReg := regexp.MustCompile(`[0-9]+\)|<b>|</b>`)
-
-	extraSpacesReg := regexp.MustCompile(`\s+`)
-
-	tasks := make([]models.Task, 0)
-
-	for _, element := range foundedQuestionsWithAnswers {
-		question := questionReg.FindAllString(element, 1)[0]
-		question = excessQuestionSymbolsReg.ReplaceAllString(question, "")
-		question = extraSpacesReg.ReplaceAllString(question, " ")
-		question = question[:len(question)-1]
-
-		options := optionsReg.FindAllString(element, -1)[1:]
-		for i := 0; i < len(options); i++ {
-			options[i] = excessOptionsSymbolsReg.ReplaceAllString(options[i], "")
-			options[i] = extraSpacesReg.ReplaceAllString(options[i], " ")
-		}
-
-		answers := answerReg.FindAllString(element, -1)
-		var answer string
-		if len(answers) > 1 {
-			answer = answers[1]
-		} else {
-			answer = answers[0]
-		}
-		answer = excessAnswerSymbolsReg.ReplaceAllString(answer, "")
-		answer = extraSpacesReg.ReplaceAllString(answer, " ")
-		firstClosingBraceInd := strings.Index(answer, ">")
-		lastOpeningBraceInd := strings.LastIndex(answer, "<")
-		answer = answer[firstClosingBraceInd+1 : lastOpeningBraceInd]
-
-		task := models.NewTask()
-		task.Question = question
-		task.Options = options
-		task.Answer = answer
-		tasks = append(tasks, *task)
-	}
-
-	return tasks
 }

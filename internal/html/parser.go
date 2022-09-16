@@ -69,6 +69,7 @@ func (parser *Parser) parseQuestion(taskBlock string) string {
 func (parser *Parser) parseOptions(taskBlock string) []string {
 	options := parser.optionsBlockReg.FindAllString(taskBlock, -1)[1:]
 	for i := 0; i < len(options); i++ {
+		options[i] = parser.extraSpacesReg.ReplaceAllString(options[i], " ")
 		options[i] = parser.excessOptionsSymbolsReg.ReplaceAllString(options[i], "")
 		options[i] = parser.extraSpacesReg.ReplaceAllString(options[i], " ")
 	}
@@ -85,6 +86,7 @@ func (parser *Parser) parseAnswer(taskBlock string) string {
 		answer = answers[0]
 	}
 
+	answer = parser.extraSpacesReg.ReplaceAllString(answer, " ")
 	answer = parser.excessAnswerSymbolsReg.ReplaceAllString(answer, "")
 	answer = parser.extraSpacesReg.ReplaceAllString(answer, " ")
 

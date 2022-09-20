@@ -8,24 +8,16 @@ import (
 	"regexp"
 
 	"github.com/adepte-myao/test_parser/internal/dto"
-	"github.com/adepte-myao/test_parser/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
 type LinksHandler struct {
-	logger      *logrus.Logger
-	testsClient *http.Client
+	logger *logrus.Logger
 }
 
 func NewLinksHandler(logger *logrus.Logger) *LinksHandler {
-	client, err := tools.NewTestsClient()
-	if err != nil {
-		panic(err)
-	}
-
 	return &LinksHandler{
-		logger:      logger,
-		testsClient: client,
+		logger: logger,
 	}
 }
 
@@ -42,11 +34,8 @@ func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := "https://test24.ru/"
-	method := "GET"
-
 	client := &http.Client{}
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(http.MethodGet, rd.Link, nil)
 
 	if err != nil {
 		handler.logger.Error("Can't make a proper request")
@@ -79,40 +68,31 @@ func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		for k, v := range req.Header {
 			rw.Write([]byte(fmt.Sprint(k, " ", v, "\n")))
 		}
-
-		cookies := tools.GetCookies(handler.testsClient, rd.Link)
-		for _, cookie := range cookies {
-			rw.Write([]byte(cookie.String()))
-			rw.Write([]byte("\n"))
-		}
 		return
 	}
 
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		handler.logger.Error("Can't read response body")
+
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte("Error when reading response body"))
+		return
+	}
+
+	bodyString := string(bodyBytes)
+	entries := getAllHrefPartsFromStringifyBody(bodyString)
+
 	rw.WriteHeader(http.StatusOK)
-	io.Copy(rw, resp.Body)
-
-	// bodyBytes, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	handler.logger.Error("Can't read response body")
-
-	// 	rw.WriteHeader(http.StatusInternalServerError)
-	// 	rw.Write([]byte("Error when reading response body"))
-	// 	return
-	// }
-
-	// bodyString := string(bodyBytes)
-	// entries := getAllHrefPartsFromStringifyBody(bodyString)
-
-	// rw.WriteHeader(http.StatusOK)
-	// for _, v := range entries {
-	// 	ref := getReferenceFromHref(v)
-	// 	rw.Write([]byte(ref))
-	// 	rw.Write([]byte("\n"))
-	// }
+	for _, v := range entries {
+		ref := getReferenceFromHref(v)
+		rw.Write([]byte(ref))
+		rw.Write([]byte("\n"))
+	}
 }
 
 func getAllHrefPartsFromStringifyBody(str string) []string {
-	reg := regexp.MustCompile(`href="[^"]*://[^"]*"`)
+	reg := regexp.MustCompile(`href="[^"]*/[^"]*"`)
 	return reg.FindAllString(str, -1)
 }
 

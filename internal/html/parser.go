@@ -39,7 +39,7 @@ func NewParser() *Parser {
 	}
 }
 
-func (parser *Parser) ParseHtml(html string) []models.Task {
+func (parser *Parser) ParseHtml(html string) ([]models.Task, error) {
 	foundedTasks := parser.taskBlockReg.FindAllString(html, -1)
 
 	tasks := make([]models.Task, 0)
@@ -56,7 +56,7 @@ func (parser *Parser) ParseHtml(html string) []models.Task {
 		tasks = append(tasks, *task)
 	}
 
-	return tasks
+	return tasks, nil
 }
 
 func (parser *Parser) parseQuestion(taskBlock string) string {

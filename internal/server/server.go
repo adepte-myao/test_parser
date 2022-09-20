@@ -2,39 +2,42 @@ package server
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/adepte-myao/test_parser/internal/html"
+	"github.com/adepte-myao/test_parser/internal/handlers"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
 	http.Server
-	config     *ServerConfig
-	logger     *logrus.Logger
-	router     *mux.Router
-	htmlParser *html.Parser
+	config          *ServerConfig
+	logger          *logrus.Logger
+	router          *mux.Router
+	taskPageHandler *handlers.TaskPageHandler
+	linksHandler    *handlers.LinksHandler
 }
 
 func NewServer(config *ServerConfig) *Server {
-	return &Server{
-		config:     config,
-		logger:     logrus.New(),
-		router:     mux.NewRouter(),
-		htmlParser: html.NewParser(),
+	serv := &Server{
+		config: config,
+		logger: logrus.New(),
+		router: mux.NewRouter(),
 	}
+
+	serv.taskPageHandler = handlers.NewTaskPageHandler(serv.logger)
+	serv.linksHandler = handlers.NewLinksHandler(serv.logger)
+
+	return serv
 }
 
 func (s *Server) Start() error {
 	if err := s.configureLogger(); err != nil {
 		return err
 	}
-
 	s.configureRouter()
 	s.congfigureServer()
 
@@ -76,8 +79,8 @@ func (s *Server) configureLogger() error {
 }
 
 func (s *Server) configureRouter() {
-	s.router.HandleFunc("/", s.handleHmtl)
-	s.router.HandleFunc("/file", s.handleFile)
+	s.router.HandleFunc("/site", s.taskPageHandler.Handle)
+	s.router.HandleFunc("/links", s.linksHandler.Handle)
 }
 
 func (s *Server) congfigureServer() {
@@ -86,62 +89,4 @@ func (s *Server) congfigureServer() {
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
 	s.WriteTimeout = 3 * time.Second
-}
-
-func (s *Server) handleHmtl(rw http.ResponseWriter, r *http.Request) {
-	s.logger.Info("Received handle simple HTML request")
-
-	resp, err := http.Get("https://tests24.ru/?iter=3&test=726")
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		rw.WriteHeader(http.StatusBadGateway)
-		rw.Write([]byte("Response from given source is not OK"))
-		return
-	}
-
-	_, err = io.Copy(rw, resp.Body)
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	rw.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) handleFile(rw http.ResponseWriter, r *http.Request) {
-	s.logger.Info("Received handleFile request")
-
-	data, err := os.ReadFile("src.html")
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte(err.Error()))
-		return
-	}
-
-	dataStr := string(data)
-
-	tasks := s.htmlParser.ParseHtml(dataStr)
-
-	rw.WriteHeader(http.StatusOK)
-	for _, task := range tasks {
-		rw.Write([]byte(task.Question))
-
-		rw.Write([]byte("\n"))
-		for _, option := range task.Options {
-			rw.Write([]byte("\t"))
-			rw.Write([]byte(option))
-			rw.Write([]byte("\n"))
-		}
-
-		rw.Write([]byte("\tRight answer: "))
-		rw.Write([]byte(task.Answer))
-
-		rw.Write([]byte("\n\n"))
-	}
 }

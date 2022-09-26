@@ -29,7 +29,7 @@ func NewServer(config *ServerConfig) *Server {
 	}
 
 	serv.taskPageHandler = handlers.NewTaskPageHandler(serv.logger)
-	serv.linksHandler = handlers.NewLinksHandler(serv.logger)
+	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.BaseLink)
 
 	return serv
 }

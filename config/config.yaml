@@ -1,3 +1,4 @@
 server:
   bind_addr: ":9095"
   log_level: "debug"
+  link: "https://tests24.ru/"

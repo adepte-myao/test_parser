@@ -1,56 +1,33 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
 
-	"github.com/adepte-myao/test_parser/internal/dto"
 	"github.com/sirupsen/logrus"
 )
 
 type LinksHandler struct {
-	logger *logrus.Logger
+	logger   *logrus.Logger
+	baseLink string
 }
 
-func NewLinksHandler(logger *logrus.Logger) *LinksHandler {
+func NewLinksHandler(logger *logrus.Logger, baseLink string) *LinksHandler {
 	return &LinksHandler{
-		logger: logger,
+		logger:   logger,
+		baseLink: baseLink,
 	}
 }
 
 func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Find all links request received")
 
-	var rd dto.LinksRequestData
-	err := json.NewDecoder(r.Body).Decode(&rd)
+	resp, err := doRequest(http.MethodGet, handler.baseLink)
 	if err != nil {
-		handler.logger.Error("[ERROR] Decoding failed, stop processing")
-
-		rw.WriteHeader(http.StatusBadRequest)
-		rw.Write([]byte("Invalid object body, must be dto.LinksRequestData"))
-		return
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, rd.Link, nil)
-
-	if err != nil {
-		handler.logger.Error("Can't make a proper request")
+		handler.logger.Error("cannot do request: ", err)
 
 		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("Request creating wasn't successful"))
-	}
-	req.Header.Set("User-Agent", "")
-	req.Header.Add("Cookie", "tester=%D0%98%D0%BD%D0%BA%D0%BE%D0%B3%D0%BD%D0%B8%D1%82%D0%BE")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		handler.logger.Error("Can't receive response from given source, stop processing", err)
-
-		rw.WriteHeader(http.StatusBadGateway)
 		rw.Write([]byte("Response from given source wasn't received. Check your URL or try later"))
 		return
 	}
@@ -58,16 +35,7 @@ func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 
 	if resp.StatusCode != http.StatusOK {
 		handler.logger.Error("Status code is not OK, stop processing")
-
-		rw.WriteHeader(http.StatusBadGateway)
-		rw.Write([]byte("Response from given source is "))
-		rw.Write([]byte(resp.Status))
-		rw.Write([]byte("\n"))
-		io.Copy(rw, resp.Body)
-
-		for k, v := range req.Header {
-			rw.Write([]byte(fmt.Sprint(k, " ", v, "\n")))
-		}
+		sendErrorResponse(rw, resp)
 		return
 	}
 
@@ -82,10 +50,11 @@ func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 
 	bodyString := string(bodyBytes)
 	entries := getAllHrefPartsFromStringifyBody(bodyString)
+	references := getReferencesFromHref(entries)
+	absoluteReferences := getProperReferences(handler.baseLink, references)
 
 	rw.WriteHeader(http.StatusOK)
-	for _, v := range entries {
-		ref := getReferenceFromHref(v)
+	for _, ref := range absoluteReferences {
 		rw.Write([]byte(ref))
 		rw.Write([]byte("\n"))
 	}
@@ -96,7 +65,49 @@ func getAllHrefPartsFromStringifyBody(str string) []string {
 	return reg.FindAllString(str, -1)
 }
 
-func getReferenceFromHref(hrefMatch string) string {
-	// hrefMatch is a string like `href="required-reference.org"`
-	return hrefMatch[6 : len(hrefMatch)-1]
+func getReferencesFromHref(hrefMatches []string) []string {
+	out := make([]string, 0)
+	for _, hrefMatch := range hrefMatches {
+		// hrefMatch is a string like `href="required-reference.org"`
+		cleanRef := hrefMatch[6 : len(hrefMatch)-1]
+
+		out = append(out, cleanRef)
+	}
+
+	return out
+}
+
+func getProperReferences(base string, allRefs []string) []string {
+	regFindRelativesRefs := regexp.MustCompile(`/?iter=.*`)
+	out := make([]string, 0)
+	for _, ref := range allRefs {
+		result := regFindRelativesRefs.FindString(ref)
+
+		if result != "" {
+			out = append(out, base+result)
+		}
+	}
+
+	return out
+}
+
+func doRequest(method string, url string) (*http.Response, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "")
+	req.Header.Add("Cookie", "tester=%D0%98%D0%BD%D0%BA%D0%BE%D0%B3%D0%BD%D0%B8%D1%82%D0%BE")
+
+	return client.Do(req)
+}
+
+func sendErrorResponse(rw http.ResponseWriter, resp *http.Response) {
+	rw.WriteHeader(http.StatusBadGateway)
+	rw.Write([]byte("Response from given source is "))
+	rw.Write([]byte(resp.Status))
+	rw.Write([]byte("\n"))
+	io.Copy(rw, resp.Body)
 }

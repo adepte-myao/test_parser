@@ -58,7 +58,7 @@ func (s *Server) Start() error {
 	select {
 	case sig := <-sigChan:
 		s.logger.Info("Received terminate, graceful shutdown. Signal:", sig)
-		tc, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		tc, cancelFunc := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancelFunc()
 		s.Shutdown(tc)
 	case err := <-errChan:
@@ -88,5 +88,5 @@ func (s *Server) congfigureServer() {
 	s.Handler = s.router
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
-	s.WriteTimeout = 3 * time.Second
+	s.WriteTimeout = 600 * time.Second
 }

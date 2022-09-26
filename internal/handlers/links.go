@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -11,41 +13,82 @@ import (
 type LinksHandler struct {
 	logger   *logrus.Logger
 	baseLink string
+	links    []string
 }
 
 func NewLinksHandler(logger *logrus.Logger, baseLink string) *LinksHandler {
+	links := make([]string, 0)
+	links = append(links, baseLink)
+
 	return &LinksHandler{
 		logger:   logger,
 		baseLink: baseLink,
+		links:    links,
 	}
 }
 
-func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
+func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Find all links request received")
 
-	resp, err := doRequest(http.MethodGet, handler.baseLink)
+	currentLinkIndex := -1
+	for currentLinkIndex < len(handler.links) {
+		if currentLinkIndex == 1000 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+		currentLinkIndex++
+
+		handler.logger.Info("Processing link:", handler.links[currentLinkIndex])
+
+		pageLinks, err := handler.processLink(handler.links[currentLinkIndex])
+		if err != nil {
+			handler.logger.Warn("Link: ", handler.links[currentLinkIndex], " error when processing")
+			continue
+		}
+
+		for _, link := range pageLinks {
+			if handler.linksContain(link) {
+				continue
+			}
+
+			handler.links = append(handler.links, link)
+		}
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	for _, link := range handler.links {
+		rw.Write([]byte(link))
+		rw.Write([]byte("\n"))
+	}
+
+	handler.logger.Info("Find all links: processing finished")
+}
+
+func (handler *LinksHandler) linksContain(link string) bool {
+	for _, existingLink := range handler.links {
+		if existingLink == link {
+			return true
+		}
+	}
+	return false
+}
+
+func (handler *LinksHandler) processLink(link string) ([]string, error) {
+	resp, err := doRequest(http.MethodGet, link)
 	if err != nil {
 		handler.logger.Error("cannot do request: ", err)
-
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("Response from given source wasn't received. Check your URL or try later"))
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		handler.logger.Error("Status code is not OK, stop processing")
-		sendErrorResponse(rw, resp)
-		return
+		return nil, fmt.Errorf("status code from source %s is not OK", link)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		handler.logger.Error("Can't read response body")
-
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("Error when reading response body"))
-		return
+		return nil, err
 	}
 
 	bodyString := string(bodyBytes)
@@ -53,11 +96,7 @@ func (handler LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	references := getReferencesFromHref(entries)
 	absoluteReferences := getProperReferences(handler.baseLink, references)
 
-	rw.WriteHeader(http.StatusOK)
-	for _, ref := range absoluteReferences {
-		rw.Write([]byte(ref))
-		rw.Write([]byte("\n"))
-	}
+	return absoluteReferences, nil
 }
 
 func getAllHrefPartsFromStringifyBody(str string) []string {
@@ -78,14 +117,19 @@ func getReferencesFromHref(hrefMatches []string) []string {
 }
 
 func getProperReferences(base string, allRefs []string) []string {
-	regFindRelativesRefs := regexp.MustCompile(`/?iter=.*`)
+	regFindRelativesRefs := regexp.MustCompile(`/\?iter=.*`)
 	out := make([]string, 0)
 	for _, ref := range allRefs {
 		result := regFindRelativesRefs.FindString(ref)
 
 		if result != "" {
-			out = append(out, base+result)
+			out = append(out, base+(result[1:]))
 		}
+	}
+
+	regExcludeSemiCol := regexp.MustCompile(`amp|;`)
+	for i := 0; i < len(out); i++ {
+		out[i] = regExcludeSemiCol.ReplaceAllString(out[i], "")
 	}
 
 	return out

@@ -19,7 +19,11 @@ type Parser struct {
 	answerReg              *regexp.Regexp
 	excessAnswerSymbolsReg *regexp.Regexp
 
+	nameTagReg  *regexp.Regexp
+	valueTagReg *regexp.Regexp
+
 	extraSpacesReg *regexp.Regexp
+	oneSpaceReg    *regexp.Regexp
 }
 
 func NewParser() *Parser {
@@ -32,14 +36,55 @@ func NewParser() *Parser {
 		optionsBlockReg:         regexp.MustCompile(`<span[[:print:][:cntrl:]А-Яа-я№«»]*?</span>`),
 		excessOptionsSymbolsReg: regexp.MustCompile(`<b>|</b>|<span[[:print:][:cntrl:]]*?>|</span>|[0-9]+\) `),
 
-		answerReg:              regexp.MustCompile(`color:#3ea82e[[:print:][:cntrl:]А-Яа-я№«»]*?</span>`),
+		answerReg:              regexp.MustCompile(`color:#[2-5][c-f][a-d][6-9][1-4][c-f][[:print:][:cntrl:]А-Яа-я№«»]*?</span>`),
 		excessAnswerSymbolsReg: regexp.MustCompile(`[0-9]+\)|<b>|</b>`),
 
+		nameTagReg:  regexp.MustCompile(`name=".*?"`),
+		valueTagReg: regexp.MustCompile(`value=".*?"`),
+
 		extraSpacesReg: regexp.MustCompile(`\s+`),
+		oneSpaceReg:    regexp.MustCompile(`\s*`),
 	}
 }
 
-func (parser *Parser) ParseHtml(html string) ([]models.Task, error) {
+type FormDataValues struct {
+	QuestionName string
+	RatioName    string
+	RatioValue   string
+}
+
+func (parser *Parser) ParseTasks(html string) []FormDataValues {
+	foundedTasks := parser.taskBlockReg.FindAllString(html, -1)
+
+	formDataValues := make([]FormDataValues, 0)
+	for _, task := range foundedTasks {
+		task = parser.oneSpaceReg.ReplaceAllString(task, "")
+
+		names := parser.nameTagReg.FindAllString(task, -1)
+		values := parser.valueTagReg.FindAllString(task, -1)
+
+		qName := names[0][6:]
+		qName = qName[:len(qName)-1]
+
+		ratioName := names[1][6:]
+		ratioName = ratioName[:len(ratioName)-1]
+
+		ratioValue := values[1][7:]
+		ratioValue = ratioValue[:len(ratioValue)-1]
+
+		formDataValue := FormDataValues{
+			QuestionName: qName,
+			RatioName:    ratioName,
+			RatioValue:   ratioValue,
+		}
+
+		formDataValues = append(formDataValues, formDataValue)
+	}
+
+	return formDataValues
+}
+
+func (parser *Parser) ParseSolution(html string) ([]models.Task, error) {
 	foundedTasks := parser.taskBlockReg.FindAllString(html, -1)
 
 	tasks := make([]models.Task, 0)

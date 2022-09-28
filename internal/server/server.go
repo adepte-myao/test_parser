@@ -19,6 +19,7 @@ type Server struct {
 	router          *mux.Router
 	taskPageHandler *handlers.TaskPageHandler
 	linksHandler    *handlers.LinksHandler
+	solutionHandler *handlers.SolutionHandler
 }
 
 func NewServer(config *ServerConfig) *Server {
@@ -30,6 +31,7 @@ func NewServer(config *ServerConfig) *Server {
 
 	serv.taskPageHandler = handlers.NewTaskPageHandler(serv.logger)
 	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.BaseLink)
+	serv.solutionHandler = handlers.NewSolutionHandler(serv.logger, config.BaseLink)
 
 	return serv
 }
@@ -81,6 +83,7 @@ func (s *Server) configureLogger() error {
 func (s *Server) configureRouter() {
 	s.router.HandleFunc("/site", s.taskPageHandler.Handle)
 	s.router.HandleFunc("/links", s.linksHandler.Handle)
+	s.router.HandleFunc("/solution", s.solutionHandler.Handle)
 }
 
 func (s *Server) congfigureServer() {
@@ -88,5 +91,5 @@ func (s *Server) congfigureServer() {
 	s.Handler = s.router
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
-	s.WriteTimeout = 600 * time.Second
+	s.WriteTimeout = 0 * time.Second
 }

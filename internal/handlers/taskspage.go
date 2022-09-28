@@ -52,7 +52,7 @@ func (handler *TaskPageHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 	}
 
 	dataStr := string(data)
-	tasks, err := handler.htmlParser.ParseHtml(dataStr)
+	tasks, err := handler.htmlParser.ParseSolution(dataStr)
 	if err != nil {
 		handler.logger.Error("Parsing failed")
 

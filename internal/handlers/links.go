@@ -5,37 +5,57 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 type LinksHandler struct {
-	logger   *logrus.Logger
-	baseLink string
-	links    []string
+	logger    *logrus.Logger
+	baseLink  string
+	links     []string
+	testLinks []string
 }
 
 func NewLinksHandler(logger *logrus.Logger, baseLink string) *LinksHandler {
 	links := make([]string, 0)
 	links = append(links, baseLink)
 
+	testLinks := make([]string, 0)
+
 	return &LinksHandler{
-		logger:   logger,
-		baseLink: baseLink,
-		links:    links,
+		logger:    logger,
+		baseLink:  baseLink,
+		links:     links,
+		testLinks: testLinks,
 	}
 }
 
 func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Find all links request received")
 
+	handler.findAllSourceLinks()
+	regTestLink := regexp.MustCompile(`bil=`)
+	for _, link := range handler.links {
+		if found := regTestLink.FindAllString(link, -1); len(found) == 1 {
+			handler.testLinks = append(handler.testLinks, link)
+		}
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	for _, link := range handler.testLinks {
+		rw.Write([]byte(link))
+		rw.Write([]byte("\n"))
+	}
+
+	handler.logger.Info("Find all links: processing finished")
+}
+
+func (handler *LinksHandler) findAllSourceLinks() {
 	currentLinkIndex := -1
-	for currentLinkIndex < len(handler.links) {
-		if currentLinkIndex == 1000 {
+	for currentLinkIndex < len(handler.links)-1 {
+		if currentLinkIndex == 100000 {
 			break
 		}
-		time.Sleep(50 * time.Millisecond)
 		currentLinkIndex++
 
 		handler.logger.Info("Processing link:", handler.links[currentLinkIndex])
@@ -54,14 +74,6 @@ func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 			handler.links = append(handler.links, link)
 		}
 	}
-
-	rw.WriteHeader(http.StatusOK)
-	for _, link := range handler.links {
-		rw.Write([]byte(link))
-		rw.Write([]byte("\n"))
-	}
-
-	handler.logger.Info("Find all links: processing finished")
 }
 
 func (handler *LinksHandler) linksContain(link string) bool {
@@ -118,11 +130,15 @@ func getReferencesFromHref(hrefMatches []string) []string {
 
 func getProperReferences(base string, allRefs []string) []string {
 	regFindRelativesRefs := regexp.MustCompile(`/\?iter=.*`)
+
 	out := make([]string, 0)
 	for _, ref := range allRefs {
 		result := regFindRelativesRefs.FindString(ref)
 
 		if result != "" {
+			// base format: https://blabla/
+			// result format: /ddd/asd/asd
+			// to get proper reference it's required to exclude one /
 			out = append(out, base+(result[1:]))
 		}
 	}

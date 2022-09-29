@@ -17,7 +17,6 @@ type Server struct {
 	config          *ServerConfig
 	logger          *logrus.Logger
 	router          *mux.Router
-	taskPageHandler *handlers.TaskPageHandler
 	linksHandler    *handlers.LinksHandler
 	solutionHandler *handlers.SolutionHandler
 }
@@ -29,7 +28,6 @@ func NewServer(config *ServerConfig) *Server {
 		router: mux.NewRouter(),
 	}
 
-	serv.taskPageHandler = handlers.NewTaskPageHandler(serv.logger)
 	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.BaseLink)
 	serv.solutionHandler = handlers.NewSolutionHandler(serv.logger, config.BaseLink)
 
@@ -81,7 +79,6 @@ func (s *Server) configureLogger() error {
 }
 
 func (s *Server) configureRouter() {
-	s.router.HandleFunc("/site", s.taskPageHandler.Handle)
 	s.router.HandleFunc("/links", s.linksHandler.Handle)
 	s.router.HandleFunc("/solution", s.solutionHandler.Handle)
 }

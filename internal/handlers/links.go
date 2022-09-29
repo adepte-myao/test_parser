@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/adepte-myao/test_parser/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
@@ -86,7 +87,7 @@ func (handler *LinksHandler) linksContain(link string) bool {
 }
 
 func (handler *LinksHandler) processLink(link string) ([]string, error) {
-	resp, err := doRequest(http.MethodGet, link)
+	resp, err := tools.DoProperRequest(http.MethodGet, link)
 	if err != nil {
 		handler.logger.Error("cannot do request: ", err)
 		return nil, err
@@ -149,25 +150,4 @@ func getProperReferences(base string, allRefs []string) []string {
 	}
 
 	return out
-}
-
-func doRequest(method string, url string) (*http.Response, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "")
-	req.Header.Add("Cookie", "tester=%D0%98%D0%BD%D0%BA%D0%BE%D0%B3%D0%BD%D0%B8%D1%82%D0%BE")
-
-	return client.Do(req)
-}
-
-func sendErrorResponse(rw http.ResponseWriter, resp *http.Response) {
-	rw.WriteHeader(http.StatusBadGateway)
-	rw.Write([]byte("Response from given source is "))
-	rw.Write([]byte(resp.Status))
-	rw.Write([]byte("\n"))
-	io.Copy(rw, resp.Body)
 }

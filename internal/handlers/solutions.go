@@ -6,12 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/adepte-myao/test_parser/internal/html"
-	"github.com/adepte-myao/test_parser/internal/models"
 	"github.com/adepte-myao/test_parser/internal/tools"
 	"github.com/sirupsen/logrus"
 )
@@ -40,17 +37,25 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 	}
 	defer f.Close()
 
+	outFile, err := os.Create("TestsFile.txt")
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte("can't create the file"))
+	}
+	defer outFile.Close()
+
 	rw.WriteHeader(http.StatusOK)
 	reader := bufio.NewReader(f)
+	writer := bufio.NewWriter(outFile)
 	i := -1
 	for {
 		i++
-		if i == 4 {
-			break
-		}
+		// if i == 2 {
+		// 	break
+		// }
 
-		testLink, err := reader.ReadString('\n')
-		if err != nil { // EOF?
+		testLink, errFileRead := reader.ReadString('\n')
+		if errFileRead != nil && errFileRead != io.EOF {
 			handler.logger.Debug("Error reading line")
 			return
 		}
@@ -60,23 +65,21 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 			handler.logger.Debug("Error when getting response: ", err.Error())
 			continue
 		}
-
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			handler.logger.Error("Status code from site is not OK")
+			handler.logger.Warn("Status code from site is ", resp.StatusCode)
 
-			rw.WriteHeader(http.StatusBadGateway)
-			rw.Write([]byte("Response from given source is not OK"))
-			return
+			rw.Write([]byte(fmt.Sprint("Response from ", testLink, "is not OK\n")))
+			continue
 		}
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			handler.logger.Error("Reading from response failed")
 
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+			rw.Write([]byte(fmt.Sprint("Error when processing ", testLink, "\n")))
+			continue
 		}
 
 		dataStr := string(data)
@@ -84,19 +87,22 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			handler.logger.Error("Parsing failed")
 
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
+			rw.Write([]byte(fmt.Sprint("Error when parsing", testLink, "\n")))
+			continue
 		}
 
-		rw.WriteHeader(http.StatusOK)
-		handler.writeTasksToResponse(rw, tasks)
+		tools.WriteTasks(writer, tasks)
+
+		if errFileRead == io.EOF {
+			break
+		}
 	}
 
 	handler.logger.Info("Solution request: processing finished")
 }
 
 func (handler *SolutionHandler) respFromResultPage(link string) (*http.Response, error) {
-	resp, err := doRequest(http.MethodGet, link)
+	resp, err := tools.DoProperRequest(http.MethodGet, link)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +115,7 @@ func (handler *SolutionHandler) respFromResultPage(link string) (*http.Response,
 	stringifyBody := string(body)
 
 	formData := handler.htmlParser.ParseTasks(stringifyBody)
-	params := parseLinkValues(link)
+	params := tools.ExtractQueryParams(link)
 
 	form := tools.NewForm()
 	for _, formValues := range formData {
@@ -117,62 +123,19 @@ func (handler *SolutionHandler) respFromResultPage(link string) (*http.Response,
 		form.Add(formValues.RatioName, formValues.RatioValue)
 	}
 	form.Add("Width", "")
-	form.Add("iter", params[0])
-	form.Add("bil", params[1])
-	form.Add("test", params[2])
+	form.Add("iter", fmt.Sprint(params.Iter+1))
+	form.Add("bil", fmt.Sprint(params.Bil))
+	form.Add("test", fmt.Sprint(params.Test))
 
 	req, err := http.NewRequest(http.MethodPost, handler.baseLink, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36")
 	req.Header.Add("Cookie", "tester=%D0%98%D0%BD%D0%BA%D0%BE%D0%B3%D0%BD%D0%B8%D1%82%D0%BE")
 	req.Header.Add("referer", link)
 	req.Header.Set("content-type", "application/x-www-form-urlencoded")
 
 	handler.logger.Info("Making request: ", link)
 	return http.DefaultClient.Do(req)
-}
-
-func parseLinkValues(link string) [3]string {
-	iterReg := regexp.MustCompile(`iter=[0-9]+`)
-	bilReg := regexp.MustCompile(`bil=[0-9]+`)
-	testReg := regexp.MustCompile(`test=[0-9]+`)
-
-	iter := iterReg.FindAllString(link, -1)[0]
-	bil := bilReg.FindAllString(link, -1)[0]
-	test := testReg.FindAllString(link, -1)[0]
-
-	iterNumb, err := strconv.Atoi(iter[5:])
-	if err != nil {
-		panic(err)
-	}
-	bilNumb, err := strconv.Atoi(bil[4:])
-	if err != nil {
-		panic(err)
-	}
-	testNumb, err := strconv.Atoi(test[5:])
-	if err != nil {
-		panic(err)
-	}
-
-	return [3]string{fmt.Sprint(iterNumb + 1), fmt.Sprint(bilNumb + 1), fmt.Sprint(testNumb)}
-}
-
-func (handler *SolutionHandler) writeTasksToResponse(rw http.ResponseWriter, tasks []models.Task) {
-	for _, task := range tasks {
-		rw.Write([]byte(task.Question))
-
-		rw.Write([]byte("\n"))
-		for _, option := range task.Options {
-			rw.Write([]byte("\t"))
-			rw.Write([]byte(option))
-			rw.Write([]byte("\n"))
-		}
-
-		rw.Write([]byte("\tRight answer: "))
-		rw.Write([]byte(task.Answer))
-
-		rw.Write([]byte("\n\n"))
-	}
 }

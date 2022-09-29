@@ -93,6 +93,9 @@ func (parser *Parser) ParseSolution(html string) ([]models.Task, error) {
 		question := parser.parseQuestion(taskBlock)
 		options := parser.parseOptions(taskBlock)
 		answer := parser.parseAnswer(taskBlock)
+		if answer == "" {
+			continue
+		}
 
 		task := models.NewTask()
 		task.Question = question
@@ -125,6 +128,10 @@ func (parser *Parser) parseOptions(taskBlock string) []string {
 
 func (parser *Parser) parseAnswer(taskBlock string) string {
 	answers := parser.answerReg.FindAllString(taskBlock, -1)
+
+	if len(answers) == 0 {
+		return ""
+	}
 
 	var answer string
 	if len(answers) > 1 {

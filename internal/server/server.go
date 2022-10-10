@@ -7,29 +7,32 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/adepte-myao/test_parser/internal/config"
 	"github.com/adepte-myao/test_parser/internal/handlers"
+	"github.com/adepte-myao/test_parser/internal/storage"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
 	http.Server
-	config          *ServerConfig
+	config          *config.Config
 	logger          *logrus.Logger
 	router          *mux.Router
 	linksHandler    *handlers.LinksHandler
 	solutionHandler *handlers.SolutionHandler
+	store           *storage.Store
 }
 
-func NewServer(config *ServerConfig) *Server {
+func NewServer(config *config.Config) *Server {
 	serv := &Server{
 		config: config,
 		logger: logrus.New(),
 		router: mux.NewRouter(),
 	}
 
-	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.BaseLink)
-	serv.solutionHandler = handlers.NewSolutionHandler(serv.logger, config.BaseLink)
+	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.Server.BaseLink)
+	serv.solutionHandler = handlers.NewSolutionHandler(serv.logger, config.Server.BaseLink)
 
 	return serv
 }
@@ -40,6 +43,11 @@ func (s *Server) Start() error {
 	}
 	s.configureRouter()
 	s.congfigureServer()
+
+	if err := s.configureStore(); err != nil {
+		return err
+	}
+	defer s.store.Close()
 
 	errChan := make(chan error, 1)
 	go func() {
@@ -60,6 +68,8 @@ func (s *Server) Start() error {
 		s.logger.Info("Received terminate, graceful shutdown. Signal:", sig)
 		tc, cancelFunc := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancelFunc()
+
+		defer s.store.Close()
 		s.Shutdown(tc)
 	case err := <-errChan:
 		return err
@@ -69,7 +79,7 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) configureLogger() error {
-	level, err := logrus.ParseLevel(s.config.LogLevel)
+	level, err := logrus.ParseLevel(s.config.Server.LogLevel)
 	if err != nil {
 		return err
 	}
@@ -81,12 +91,29 @@ func (s *Server) configureLogger() error {
 func (s *Server) configureRouter() {
 	s.router.HandleFunc("/links", s.linksHandler.Handle)
 	s.router.HandleFunc("/solution", s.solutionHandler.Handle)
+	s.router.HandleFunc("/ping", s.ping)
 }
 
 func (s *Server) congfigureServer() {
-	s.Addr = s.config.BindAddr
+	s.Addr = s.config.Server.BindAddr
 	s.Handler = s.router
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
 	s.WriteTimeout = 0 * time.Second
+}
+
+func (s *Server) configureStore() error {
+	st := storage.NewStore((*storage.StoreConfig)(&s.config.Store), s.logger)
+	if err := st.Open(); err != nil {
+		return err
+	}
+
+	s.store = st
+
+	return nil
+}
+
+func (s *Server) ping(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Hello from proxy!"))
 }

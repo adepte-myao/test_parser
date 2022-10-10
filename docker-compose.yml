@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+
+  parser:
+    container_name: parser
+
+    build:
+      context: ./
+      dockerfile: ./build/docker/parser/Dockerfile
+    ports:
+      - 9095:9095
+    links:
+      - db
+    depends_on:
+      - db
+
+  db:
+    container_name: db_parser
+    build: ./build/docker/db
+    restart: always
+    volumes:
+      - pgs_volume:/var/lib/postgresql/data
+    ports:
+      - 5555:5432
+    environment:
+      POSTGRES_USER: parser
+      POSTGRES_PASSWORD: superpass
+      POSTGRES_DB: tests
+
+volumes:
+  pgs_volume:

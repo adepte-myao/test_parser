@@ -25,7 +25,7 @@ func main() {
 		return
 	}
 
-	server := server.NewServer((*server.ServerConfig)(&cfg.Server))
+	server := server.NewServer(&cfg)
 	err = server.Start()
 	if err != nil {
 		fmt.Println("[ERROR]: ", err)

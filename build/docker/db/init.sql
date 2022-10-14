@@ -1,10 +1,15 @@
 CREATE TABLE IF NOT EXISTS tasks (
     id SERIAL NOT NULL PRIMARY KEY,
-    question VARCHAR(256) NOT NULL UNIQUE,
-    answer VARCHAR(256) NOT NULL
+    question VARCHAR(512) NOT NULL UNIQUE,
+    answer VARCHAR(512) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS options (
     id SERIAL NOT NULL PRIMARY KEY,
     question_id INTEGER REFERENCES tasks (id) ON DELETE CASCADE,
-    option VARCHAR(256) NOT NULL
+    answer_option VARCHAR(512) NOT NULL,
+    CONSTRAINT unique_options UNIQUE (question_id, answer_option)
+);
+CREATE TABLE IF NOT EXISTS links (
+    id SERIAL NOT NULL PRIMARY KEY,
+    reference VARCHAR(128) NOT NULL
 );

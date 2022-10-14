@@ -1,66 +1,52 @@
 package handlers
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/adepte-myao/test_parser/internal/html"
+	"github.com/adepte-myao/test_parser/internal/storage"
 	"github.com/adepte-myao/test_parser/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
 type SolutionHandler struct {
-	logger     *logrus.Logger
-	htmlParser *html.Parser
-	baseLink   string
+	logger          *logrus.Logger
+	linksRepository *storage.LinkRepository
+	taskRepository  *storage.TaskRepository
+	htmlParser      *html.Parser
+	baseLink        string
 }
 
-func NewSolutionHandler(logger *logrus.Logger, baseLink string) *SolutionHandler {
+func NewSolutionHandler(logger *logrus.Logger, baseLink string, store *storage.Store) *SolutionHandler {
+	linksRepo := storage.NewLinksRepository(store)
+	taskRepo := storage.NewTaskRepository(store)
+
 	return &SolutionHandler{
-		logger:     logger,
-		htmlParser: html.NewParser(),
-		baseLink:   baseLink,
+		logger:          logger,
+		linksRepository: linksRepo,
+		taskRepository:  taskRepo,
+		htmlParser:      html.NewParser(),
+		baseLink:        baseLink,
 	}
 }
 
 func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Solution request received")
 
-	f, err := os.Open("allTestReferences.txt")
+	testLinks, err := handler.linksRepository.GetAllLinks()
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("can't open the file"))
+		handler.logger.Error("Error when getting links from database")
+		return
 	}
-	defer f.Close()
 
-	outFile, err := os.Create("TestsFile.txt")
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("can't create the file"))
-	}
-	defer outFile.Close()
+	handler.taskRepository.DeleteAll()
 
-	rw.WriteHeader(http.StatusOK)
-	reader := bufio.NewReader(f)
-	writer := bufio.NewWriter(outFile)
-	i := -1
-	for {
-		i++
-		// if i == 2 {
-		// 	break
-		// }
+	for _, testLink := range testLinks {
 
-		testLink, errFileRead := reader.ReadString('\n')
-		if errFileRead != nil && errFileRead != io.EOF {
-			handler.logger.Debug("Error reading line")
-			return
-		}
-
-		resp, err := handler.respFromResultPage(testLink[:len(testLink)-1])
+		resp, err := handler.respFromResultPage(string(testLink))
 		if err != nil {
 			handler.logger.Debug("Error when getting response: ", err.Error())
 			continue
@@ -91,12 +77,15 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
-		tools.WriteTasks(writer, tasks)
-
-		if errFileRead == io.EOF {
-			break
+		for _, task := range tasks {
+			err = handler.taskRepository.CreateTask(task)
+			if err != nil {
+				handler.logger.Error(err.Error())
+			}
 		}
 	}
+
+	rw.WriteHeader(http.StatusOK)
 
 	handler.logger.Info("Solution request: processing finished")
 }

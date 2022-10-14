@@ -6,28 +6,34 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/adepte-myao/test_parser/internal/models"
+	"github.com/adepte-myao/test_parser/internal/storage"
 	"github.com/adepte-myao/test_parser/internal/tools"
 	"github.com/sirupsen/logrus"
 )
 
 type LinksHandler struct {
-	logger    *logrus.Logger
-	baseLink  string
-	links     []string
-	testLinks []string
+	logger          *logrus.Logger
+	linksRepository *storage.LinkRepository
+	baseLink        string
+	links           []string
+	testLinks       []models.Link
 }
 
-func NewLinksHandler(logger *logrus.Logger, baseLink string) *LinksHandler {
+func NewLinksHandler(logger *logrus.Logger, baseLink string, store *storage.Store) *LinksHandler {
+	linksRepo := storage.NewLinksRepository(store)
+
 	links := make([]string, 0)
 	links = append(links, baseLink)
 
-	testLinks := make([]string, 0)
+	testLinks := make([]models.Link, 0)
 
 	return &LinksHandler{
-		logger:    logger,
-		baseLink:  baseLink,
-		links:     links,
-		testLinks: testLinks,
+		logger:          logger,
+		linksRepository: linksRepo,
+		baseLink:        baseLink,
+		links:           links,
+		testLinks:       testLinks,
 	}
 }
 
@@ -38,15 +44,15 @@ func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	regTestLink := regexp.MustCompile(`bil=`)
 	for _, link := range handler.links {
 		if found := regTestLink.FindAllString(link, -1); len(found) == 1 {
-			handler.testLinks = append(handler.testLinks, link)
+			handler.testLinks = append(handler.testLinks, (models.Link)(link))
 		}
 	}
 
+	handler.linksRepository.DeleteAll()
+	handler.linksRepository.CreateRange(handler.testLinks)
+
 	rw.WriteHeader(http.StatusOK)
-	for _, link := range handler.testLinks {
-		rw.Write([]byte(link))
-		rw.Write([]byte("\n"))
-	}
+	rw.Write([]byte(fmt.Sprintf("Added %d links", len(handler.testLinks))))
 
 	handler.logger.Info("Find all links: processing finished")
 }
@@ -54,7 +60,7 @@ func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 func (handler *LinksHandler) findAllSourceLinks() {
 	currentLinkIndex := -1
 	for currentLinkIndex < len(handler.links)-1 {
-		if currentLinkIndex == 100000 {
+		if currentLinkIndex == 1000000 {
 			break
 		}
 		currentLinkIndex++

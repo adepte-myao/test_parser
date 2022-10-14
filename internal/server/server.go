@@ -31,9 +31,6 @@ func NewServer(config *config.Config) *Server {
 		router: mux.NewRouter(),
 	}
 
-	serv.linksHandler = handlers.NewLinksHandler(serv.logger, config.Server.BaseLink)
-	serv.solutionHandler = handlers.NewSolutionHandler(serv.logger, config.Server.BaseLink)
-
 	return serv
 }
 
@@ -41,13 +38,14 @@ func (s *Server) Start() error {
 	if err := s.configureLogger(); err != nil {
 		return err
 	}
-	s.configureRouter()
-	s.congfigureServer()
 
 	if err := s.configureStore(); err != nil {
 		return err
 	}
 	defer s.store.Close()
+
+	s.configureRouter()
+	s.congfigureServer()
 
 	errChan := make(chan error, 1)
 	go func() {
@@ -89,6 +87,9 @@ func (s *Server) configureLogger() error {
 }
 
 func (s *Server) configureRouter() {
+	s.linksHandler = handlers.NewLinksHandler(s.logger, s.config.Server.BaseLink, s.store)
+	s.solutionHandler = handlers.NewSolutionHandler(s.logger, s.config.Server.BaseLink, s.store)
+
 	s.router.HandleFunc("/links", s.linksHandler.Handle)
 	s.router.HandleFunc("/solution", s.solutionHandler.Handle)
 	s.router.HandleFunc("/ping", s.ping)

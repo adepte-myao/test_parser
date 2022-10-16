@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/adepte-myao/test_parser/internal/handlers"
+	"github.com/adepte-myao/test_parser/internal/storage"
+	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"os"
 
 	"github.com/adepte-myao/test_parser/internal/config"
@@ -25,7 +29,15 @@ func main() {
 		return
 	}
 
-	server := server.NewServer(&cfg)
+	logger := logrus.New()
+	router := mux.NewRouter()
+	store := storage.NewStore(&cfg.Store, logger)
+
+	server := server.NewServer(&cfg, logger, router)
+
+	server.RegisterHandler("/link", handlers.NewLinksHandler(logger, cfg.Server.BaseLink, store).Handle)
+	server.RegisterHandler("/solution", handlers.NewSolutionHandler(logger, cfg.Server.BaseLink, store).Handle)
+
 	err = server.Start()
 	if err != nil {
 		fmt.Println("[ERROR]: ", err)

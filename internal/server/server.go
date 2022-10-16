@@ -8,27 +8,22 @@ import (
 	"time"
 
 	"github.com/adepte-myao/test_parser/internal/config"
-	"github.com/adepte-myao/test_parser/internal/handlers"
-	"github.com/adepte-myao/test_parser/internal/storage"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
 	http.Server
-	config          *config.Config
-	logger          *logrus.Logger
-	router          *mux.Router
-	linksHandler    *handlers.LinksHandler
-	solutionHandler *handlers.SolutionHandler
-	store           *storage.Store
+	config *config.Config
+	logger *logrus.Logger
+	router *mux.Router
 }
 
-func NewServer(config *config.Config) *Server {
+func NewServer(config *config.Config, logger *logrus.Logger, router *mux.Router) *Server {
 	serv := &Server{
 		config: config,
-		logger: logrus.New(),
-		router: mux.NewRouter(),
+		logger: logger,
+		router: router,
 	}
 
 	return serv
@@ -39,12 +34,6 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	if err := s.configureStore(); err != nil {
-		return err
-	}
-	defer s.store.Close()
-
-	s.configureRouter()
 	s.congfigureServer()
 
 	errChan := make(chan error, 1)
@@ -67,7 +56,6 @@ func (s *Server) Start() error {
 		tc, cancelFunc := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancelFunc()
 
-		defer s.store.Close()
 		s.Shutdown(tc)
 	case err := <-errChan:
 		return err
@@ -86,13 +74,8 @@ func (s *Server) configureLogger() error {
 	return nil
 }
 
-func (s *Server) configureRouter() {
-	s.linksHandler = handlers.NewLinksHandler(s.logger, s.config.Server.BaseLink, s.store)
-	s.solutionHandler = handlers.NewSolutionHandler(s.logger, s.config.Server.BaseLink, s.store)
-
-	s.router.HandleFunc("/links", s.linksHandler.Handle)
-	s.router.HandleFunc("/solution", s.solutionHandler.Handle)
-	s.router.HandleFunc("/ping", s.ping)
+func (s *Server) RegisterHandler(path string, handler http.HandlerFunc) {
+	s.router.HandleFunc(path, handler)
 }
 
 func (s *Server) congfigureServer() {
@@ -101,17 +84,6 @@ func (s *Server) congfigureServer() {
 	s.IdleTimeout = 120 * time.Second
 	s.ReadTimeout = 3 * time.Second
 	s.WriteTimeout = 0 * time.Second
-}
-
-func (s *Server) configureStore() error {
-	st := storage.NewStore((*storage.StoreConfig)(&s.config.Store), s.logger)
-	if err := st.Open(); err != nil {
-		return err
-	}
-
-	s.store = st
-
-	return nil
 }
 
 func (s *Server) ping(rw http.ResponseWriter, r *http.Request) {

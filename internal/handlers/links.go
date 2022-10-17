@@ -54,6 +54,9 @@ func (handler *LinksHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte(fmt.Sprintf("Added %d links", len(handler.testLinks))))
 
+	handler.testLinks = make([]models.Link, 0)
+	handler.links = make([]string, 0)
+
 	handler.logger.Info("Find all links: processing finished")
 }
 

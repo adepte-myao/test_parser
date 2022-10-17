@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"github.com/adepte-myao/test_parser/internal/config"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -9,12 +10,12 @@ import (
 )
 
 type Store struct {
-	config *StoreConfig
+	config *config.StoreConfig
 	db     *sql.DB
 	logger *logrus.Logger
 }
 
-func NewStore(config *StoreConfig, logger *logrus.Logger) *Store {
+func NewStore(config *config.StoreConfig, logger *logrus.Logger) *Store {
 	return &Store{
 		config: config,
 		logger: logger,

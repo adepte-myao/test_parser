@@ -86,7 +86,7 @@ func (s *Server) congfigureServer() {
 	s.WriteTimeout = 0 * time.Second
 }
 
-func (s *Server) ping(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) Ping(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Hello from proxy!"))
 }

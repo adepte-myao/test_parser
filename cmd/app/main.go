@@ -37,6 +37,7 @@ func main() {
 
 	server.RegisterHandler("/link", handlers.NewLinksHandler(logger, cfg.Server.BaseLink, store).Handle)
 	server.RegisterHandler("/solution", handlers.NewSolutionHandler(logger, cfg.Server.BaseLink, store).Handle)
+	server.RegisterHandler("/ping", server.Ping)
 
 	err = server.Start()
 	if err != nil {

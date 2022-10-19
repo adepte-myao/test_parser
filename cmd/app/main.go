@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/adepte-myao/test_parser/internal/handlers"
 	"github.com/adepte-myao/test_parser/internal/storage"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"os"
 
 	"github.com/adepte-myao/test_parser/internal/config"
 	"github.com/adepte-myao/test_parser/internal/server"
@@ -32,6 +33,10 @@ func main() {
 	logger := logrus.New()
 	router := mux.NewRouter()
 	store := storage.NewStore(&cfg.Store, logger)
+	if err = store.Open(); err != nil {
+		fmt.Println("[ERROR]: ", err)
+		return
+	}
 
 	server := server.NewServer(&cfg, logger, router)
 

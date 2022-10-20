@@ -22,9 +22,10 @@ type SitemapParser struct {
 
 	ticketReg     *regexp.Regexp
 	ticketLinkReg *regexp.Regexp
+	baseLink      string
 }
 
-func NewSitemapParser() *SitemapParser {
+func NewSitemapParser(baseLink string) *SitemapParser {
 	return &SitemapParser{
 		sectionReg:     regexp.MustCompile(`<div class="card shadow col-sm-12 col-md-.*? col-lg-4">[[:print:][:cntrl:]А-Яа-я№«»]*?</div>`),
 		sectionNameReg: regexp.MustCompile(`<h2 class="my-0 font-weight-normal">[А-Яа-я ()]+<\/h2>`),
@@ -40,6 +41,7 @@ func NewSitemapParser() *SitemapParser {
 
 		ticketReg:     regexp.MustCompile(`col-lg-2"> <div class="card flex-shrink-1 shadow">[[:print:][:cntrl:]А-Яа-я№«»]*?</div>`),
 		ticketLinkReg: regexp.MustCompile(`/\?iter=[0-9]+&[[:print:]]*?bil=[0-9]+&[[:print:]]*?test=[0-9]+`),
+		baseLink:      baseLink,
 	}
 }
 
@@ -126,7 +128,10 @@ func (parser *SitemapParser) ParseTestPage(html string) ([]models.Link, error) {
 	for _, ticketString := range ticketStrings {
 		ticketLink := parser.ticketLinkReg.FindString(ticketString)
 
-		link := models.Link(ticketLink)
+		// base format: https://blabla/
+		// result format: /ddd/asd/asd
+		// to get proper reference it's required to exclude one /
+		link := models.Link(parser.baseLink + ticketLink[1:])
 
 		links = append(links, link)
 	}

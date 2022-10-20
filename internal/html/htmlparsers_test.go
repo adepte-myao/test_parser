@@ -19,7 +19,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	sitemapParser = html.NewSitemapParser()
+	sitemapParser = html.NewSitemapParser("https://tests24.ru/")
 
 	resp, err := tools.DoProperRequest(http.MethodGet, "https://tests24.ru/")
 	if err != nil {

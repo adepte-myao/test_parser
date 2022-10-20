@@ -66,17 +66,8 @@ func TestSiteMapParser_ParseCertAreaPage(t *testing.T) {
 }
 
 func TestSiteMapParser_ParseTestPage(t *testing.T) {
-	links, err := sitemapParser.ParseTestPage(testPage)
+	_, err := sitemapParser.ParseTestPage(testPage)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	validatorReg := regexp.MustCompile(`[\<>A-Za-z"']*`)
-	for _, link := range links {
-		linkValidationString := validatorReg.FindString(string(link))
-
-		if linkValidationString != "" {
-			t.Fatal("forbidden symbol found in certArea.link")
-		}
 	}
 }

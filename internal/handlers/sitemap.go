@@ -24,7 +24,7 @@ func NewSitemapHandler(logger *logrus.Logger, baseLink string, store *storage.St
 	return &SitemapHandler{
 		logger:            logger,
 		sitemapRepository: storage.NewSitemapRepository(store),
-		sitemapParser:     html.NewSitemapParser(),
+		sitemapParser:     html.NewSitemapParser(baseLink),
 		baseLink:          models.NewLink(baseLink),
 		sections:          make([]models.Section, 0),
 	}

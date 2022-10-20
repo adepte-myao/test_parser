@@ -41,6 +41,7 @@ func main() {
 	server := server.NewServer(&cfg, logger, router)
 
 	server.RegisterHandler("/link", handlers.NewLinksHandler(logger, cfg.Server.BaseLink, store).Handle)
+	server.RegisterHandler("/sitemap", handlers.NewSitemapHandler(logger, cfg.Server.BaseLink, store).Handle)
 	server.RegisterHandler("/solution", handlers.NewSolutionHandler(logger, cfg.Server.BaseLink, store).Handle)
 	server.RegisterHandler("/ping", server.Ping)
 

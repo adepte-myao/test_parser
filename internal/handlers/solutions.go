@@ -13,30 +13,30 @@ import (
 )
 
 type SolutionHandler struct {
-	logger          *logrus.Logger
-	linksRepository *storage.LinkRepository
-	taskRepository  *storage.TaskRepository
-	htmlParser      *html.Parser
-	baseLink        string
+	logger            *logrus.Logger
+	sitemapRepository *storage.SitemapRepository
+	taskRepository    *storage.TaskRepository
+	htmlParser        *html.Parser
+	baseLink          string
 }
 
 func NewSolutionHandler(logger *logrus.Logger, baseLink string, store *storage.Store) *SolutionHandler {
-	linksRepo := storage.NewLinksRepository(store)
+	sitemapRepository := storage.NewSitemapRepository(store)
 	taskRepo := storage.NewTaskRepository(store)
 
 	return &SolutionHandler{
-		logger:          logger,
-		linksRepository: linksRepo,
-		taskRepository:  taskRepo,
-		htmlParser:      html.NewParser(),
-		baseLink:        baseLink,
+		logger:            logger,
+		sitemapRepository: sitemapRepository,
+		taskRepository:    taskRepo,
+		htmlParser:        html.NewParser(),
+		baseLink:          baseLink,
 	}
 }
 
 func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Solution request received")
 
-	testLinks, err := handler.linksRepository.GetAllLinks()
+	testLinks, err := handler.sitemapRepository.GetAllLinks()
 	if err != nil {
 		handler.logger.Error("Error when getting links from database")
 		return

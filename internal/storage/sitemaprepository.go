@@ -18,6 +18,26 @@ func NewSitemapRepository(store *Store) *SitemapRepository {
 	}
 }
 
+func (repo *SitemapRepository) GetAllLinks() ([]models.Link, error) {
+	rows, err := repo.store.db.Query("SELECT link FROM tickets")
+	if err != nil {
+		return nil, err
+	}
+
+	links := make([]models.Link, 0)
+	for rows.Next() {
+		var link models.Link
+		err := rows.Scan(&link)
+		if err != nil {
+			return nil, err
+		}
+
+		links = append(links, link)
+	}
+
+	return links, nil
+}
+
 func (repo *SitemapRepository) TruncateAllSitemapTables() error {
 	_, err := repo.store.db.Exec("TRUNCATE sections CASCADE")
 	return err

@@ -39,7 +39,12 @@ func (handler *SitemapHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		rw.Write([]byte(err.Error()))
 	}
 
-	handler.sections = handler.sitemapParser.ParseBasePage(basePage)
+	handler.sections, err = handler.sitemapParser.ParseBasePage(basePage)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte(err.Error()))
+	}
+
 	handler.excludeArchive()
 
 	for i := 0; i < len(handler.sections); i++ {
@@ -94,7 +99,10 @@ func (handler *SitemapHandler) fillSectionLinks(section *models.Section) error {
 		return err
 	}
 
-	section.CertAreas = handler.sitemapParser.ParseSectionPage(sectionPage)
+	section.CertAreas, err = handler.sitemapParser.ParseSectionPage(sectionPage)
+	if err != nil {
+		return err
+	}
 
 	for areaIndex := 0; areaIndex < len(section.CertAreas); areaIndex++ {
 		err = handler.fillCertAreaLinks(&section.CertAreas[areaIndex])
@@ -112,7 +120,10 @@ func (handler *SitemapHandler) fillCertAreaLinks(certArea *models.CertArea) erro
 		return err
 	}
 
-	certArea.Tests = handler.sitemapParser.ParseCertAreaPage(certAreaPage)
+	certArea.Tests, err = handler.sitemapParser.ParseCertAreaPage(certAreaPage)
+	if err != nil {
+		return err
+	}
 
 	for testIndex := 0; testIndex < len(certArea.Tests); testIndex++ {
 		err = handler.fillTestLinks(&certArea.Tests[testIndex])
@@ -130,7 +141,10 @@ func (handler *SitemapHandler) fillTestLinks(test *models.Test) error {
 		return err
 	}
 
-	test.TicketLinks = handler.sitemapParser.ParseTestPage(testPage)
+	test.TicketLinks, err = handler.sitemapParser.ParseTestPage(testPage)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -18,24 +18,24 @@ func NewSitemapRepository(store *Store) *SitemapRepository {
 	}
 }
 
-func (repo *SitemapRepository) GetAllLinks() ([]models.Link, error) {
-	rows, err := repo.store.db.Query("SELECT link FROM tickets")
+func (repo *SitemapRepository) GetAllTestLinks() ([]models.TestLink, error) {
+	rows, err := repo.store.db.Query("SELECT test_id, link FROM tickets")
 	if err != nil {
 		return nil, err
 	}
 
-	links := make([]models.Link, 0)
+	testLinks := make([]models.TestLink, 0)
 	for rows.Next() {
-		var link models.Link
-		err := rows.Scan(&link)
+		var testLink models.TestLink
+		err := rows.Scan(&testLink.TestId, &testLink.Link)
 		if err != nil {
 			return nil, err
 		}
 
-		links = append(links, link)
+		testLinks = append(testLinks, testLink)
 	}
 
-	return links, nil
+	return testLinks, nil
 }
 
 func (repo *SitemapRepository) TruncateAllSitemapTables() error {

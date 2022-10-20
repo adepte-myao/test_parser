@@ -36,7 +36,7 @@ func NewSolutionHandler(logger *logrus.Logger, baseLink string, store *storage.S
 func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	handler.logger.Info("Solution request received")
 
-	testLinks, err := handler.sitemapRepository.GetAllLinks()
+	testLinks, err := handler.sitemapRepository.GetAllTestLinks()
 	if err != nil {
 		handler.logger.Error("Error when getting links from database")
 		return
@@ -46,7 +46,7 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 
 	for _, testLink := range testLinks {
 
-		resp, err := handler.respFromResultPage(string(testLink))
+		resp, err := handler.respFromResultPage(string(testLink.Link))
 		if err != nil {
 			handler.logger.Debug("Error when getting response: ", err.Error())
 			continue
@@ -78,7 +78,7 @@ func (handler *SolutionHandler) Handle(rw http.ResponseWriter, r *http.Request) 
 		}
 
 		for _, task := range tasks {
-			err = handler.taskRepository.CreateTask(task)
+			err = handler.taskRepository.CreateTask(task, testLink.TestId)
 			if err != nil {
 				handler.logger.Error(err.Error())
 			}

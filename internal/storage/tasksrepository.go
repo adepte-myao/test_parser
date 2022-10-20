@@ -12,12 +12,13 @@ func NewTaskRepository(store *Store) *TaskRepository {
 	}
 }
 
-func (repo *TaskRepository) CreateTask(task models.Task) error {
+func (repo *TaskRepository) CreateTask(task models.Task, testId int) error {
 	var taskId int32
 	repo.store.db.QueryRow(
-		"INSERT INTO tasks (question, answer) VALUES ($1, $2) RETURNING id",
+		"INSERT INTO tasks (question, answer, test_id) VALUES ($1, $2, $3) RETURNING id",
 		task.Question,
 		task.Answer,
+		testId,
 	).Scan(&taskId)
 
 	for _, option := range task.Options {
@@ -32,7 +33,7 @@ func (repo *TaskRepository) CreateTask(task models.Task) error {
 }
 
 func (repo *TaskRepository) DeleteAll() error {
-	_, err := repo.store.db.Exec("TRUNCATE tasks")
+	_, err := repo.store.db.Exec("TRUNCATE tasks CASCADE")
 	if err != nil {
 		return err
 	}

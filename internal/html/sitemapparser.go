@@ -23,6 +23,8 @@ type SitemapParser struct {
 	ticketReg     *regexp.Regexp
 	ticketLinkReg *regexp.Regexp
 	baseLink      string
+
+	excessiveLinkReg *regexp.Regexp
 }
 
 func NewSitemapParser(baseLink string) *SitemapParser {
@@ -37,11 +39,13 @@ func NewSitemapParser(baseLink string) *SitemapParser {
 
 		testReg:     regexp.MustCompile(`href="/\?iter=[0-9]+&[[:print:]]*?test=[0-9]+" ><h4 class="font-weight-normal">[[:print:][:cntrl:]А-Яа-я№«»]*?<`),
 		testNameReg: regexp.MustCompile(`normal">[[:print:][:cntrl:]А-Яа-я№«»]*?<`),
-		testLinkReg: regexp.MustCompile(`/\?iter=[0-9]+&[[:print:]]*?test=[0-9]+"`),
+		testLinkReg: regexp.MustCompile(`/\?iter=[0-9]+&[[:print:]]*?test=[0-9]+`),
 
 		ticketReg:     regexp.MustCompile(`col-lg-2"> <div class="card flex-shrink-1 shadow">[[:print:][:cntrl:]А-Яа-я№«»]*?</div>`),
 		ticketLinkReg: regexp.MustCompile(`/\?iter=[0-9]+&[[:print:]]*?bil=[0-9]+&[[:print:]]*?test=[0-9]+`),
 		baseLink:      baseLink,
+
+		excessiveLinkReg: regexp.MustCompile(`amp;`),
 	}
 }
 
@@ -58,6 +62,11 @@ func (parser *SitemapParser) ParseBasePage(html string) ([]models.Section, error
 
 		sectionLink := parser.sectionLinkReg.FindString(sectionString)
 		sectionLink = sectionLink[9 : len(sectionLink)-2]
+		// base format: https://blabla/
+		// result format: /ddd/asd/asd
+		// to get proper reference it's required to exclude one /
+		sectionLink = parser.baseLink + sectionLink[1:]
+		sectionLink = parser.excessiveLinkReg.ReplaceAllString(sectionLink, "")
 
 		section := models.NewSection(
 			sectionName,
@@ -82,6 +91,8 @@ func (parser *SitemapParser) ParseSectionPage(html string) ([]models.CertArea, e
 		certAreaName = certAreaName[8 : len(certAreaName)-1]
 
 		certAreaLink := parser.certAreaLinkReg.FindString(certAreaString)
+		certAreaLink = parser.baseLink + certAreaLink[1:]
+		certAreaLink = parser.excessiveLinkReg.ReplaceAllString(certAreaLink, "")
 
 		certArea := models.NewCertArea(
 			certAreaName,
@@ -97,7 +108,7 @@ func (parser *SitemapParser) ParseSectionPage(html string) ([]models.CertArea, e
 func (parser *SitemapParser) ParseCertAreaPage(html string) ([]models.Test, error) {
 	testStrings := parser.testReg.FindAllString(html, -1)
 	if len(testStrings) == 0 {
-		return nil, fmt.Errorf("no cert areas found")
+		return nil, fmt.Errorf("no tests found")
 	}
 
 	tests := make([]models.Test, 0)
@@ -106,6 +117,8 @@ func (parser *SitemapParser) ParseCertAreaPage(html string) ([]models.Test, erro
 		testName = testName[8 : len(testName)-1]
 
 		testLink := parser.testLinkReg.FindString(testString)
+		testLink = parser.baseLink + testLink[1:]
+		testLink = parser.excessiveLinkReg.ReplaceAllString(testLink, "")
 
 		test := models.NewTest(
 			testName,
@@ -121,18 +134,15 @@ func (parser *SitemapParser) ParseCertAreaPage(html string) ([]models.Test, erro
 func (parser *SitemapParser) ParseTestPage(html string) ([]models.Link, error) {
 	ticketStrings := parser.ticketReg.FindAllString(html, -1)
 	if len(ticketStrings) == 0 {
-		return nil, fmt.Errorf("no cert areas found")
+		return nil, fmt.Errorf("no tickets found")
 	}
 
 	links := make([]models.Link, 0)
 	for _, ticketString := range ticketStrings {
 		ticketLink := parser.ticketLinkReg.FindString(ticketString)
+		ticketLink = parser.excessiveLinkReg.ReplaceAllString(ticketLink, "")
 
-		// base format: https://blabla/
-		// result format: /ddd/asd/asd
-		// to get proper reference it's required to exclude one /
 		link := models.Link(parser.baseLink + ticketLink[1:])
-
 		links = append(links, link)
 	}
 

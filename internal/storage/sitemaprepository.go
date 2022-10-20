@@ -54,7 +54,7 @@ func (repo *SitemapRepository) CreateFilledSections(sections []models.Section) e
 
 		var sectionId int
 		err = repo.currentTx.QueryRow(
-			"INSERT into sections (name) VALUES ($1) RETURNING id",
+			"INSERT INTO sections (name) VALUES ($1) RETURNING id",
 			section.Name,
 		).Scan(&sectionId)
 		if err != nil {
@@ -81,7 +81,7 @@ func (repo *SitemapRepository) createFilledCertAreas(certAreas []models.CertArea
 	for _, cerArea := range certAreas {
 		var certAreaId int
 		err := repo.currentTx.QueryRow(
-			"INSERT into cert_area (section_id, name) VALUES ($1, $2) RETURNING id",
+			"INSERT INTO cert_area (section_id, name) VALUES ($1, $2) RETURNING id",
 			sectionId,
 			cerArea.Name,
 		).Scan(&certAreaId)
@@ -102,7 +102,7 @@ func (repo *SitemapRepository) createFilledTests(tests []models.Test, certAreaId
 	for _, test := range tests {
 		var testId int
 		err := repo.currentTx.QueryRow(
-			"INSERT into tests (cert_area_id, name) VALUES ($1, $2) RETURNING id",
+			"INSERT INTO tests (cert_area_id, name) VALUES ($1, $2) RETURNING id",
 			certAreaId,
 			test.Name,
 		).Scan(&testId)
@@ -110,10 +110,7 @@ func (repo *SitemapRepository) createFilledTests(tests []models.Test, certAreaId
 			return err
 		}
 
-		err = repo.createTickets(test.TicketLinks, testId)
-		if err != nil {
-			return err
-		}
+		repo.createTickets(test.TicketLinks, testId)
 	}
 
 	return nil
@@ -124,8 +121,19 @@ func (repo *SitemapRepository) createTickets(links []models.Link, testId int) er
 		// Not going to catch error there, because there will be lots of errors like
 		// key value "lala" already exists
 		// Hope there will be no other errors
+
+		// Must check if there is the same links to avoid rollback
+		var ticket_id int
+		err := repo.currentTx.QueryRow(
+			"SELECT id FROM tickets WHERE link = $1",
+			string(link),
+		).Scan(&ticket_id)
+		if err == nil {
+			continue
+		}
+
 		repo.currentTx.Exec(
-			"INSERT into tickets (test_id, link) VALUES ($1, $2)",
+			"INSERT INTO tickets (test_id, link) VALUES ($1, $2)",
 			testId,
 			string(link),
 		)

@@ -45,6 +45,7 @@ func (handler *SitemapHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte(err.Error()))
+		return
 	}
 
 	handler.excludeArchive()
@@ -54,6 +55,7 @@ func (handler *SitemapHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(err.Error()))
+			return
 		}
 	}
 
@@ -111,7 +113,13 @@ func (handler *SitemapHandler) fillSectionLinks(section *models.Section) error {
 	}
 
 	section.CertAreas, err = handler.sitemapParser.ParseSectionPage(sectionPage)
-	if err != nil {
+	if fmt.Sprint(err) == "no cert areas found" {
+		dummyCertArea := models.NewCertArea(
+			"main certification area of" + section.Name,
+			section.Link,
+		)
+		section.CertAreas = append(section.CertAreas, *dummyCertArea)
+	} else if err != nil {
 		return err
 	}
 

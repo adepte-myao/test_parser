@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/adepte-myao/test_parser/internal/html"
 	"github.com/adepte-myao/test_parser/internal/models"
@@ -39,6 +40,7 @@ func (handler *SitemapHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		rw.Write([]byte(err.Error()))
 	}
 
+	handler.logger.Info("Parsing base site page")
 	handler.sections, err = handler.sitemapParser.ParseBasePage(basePage)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -90,10 +92,19 @@ func (handler *SitemapHandler) getStringifySourceBody(link models.Link) (string,
 }
 
 func (handler *SitemapHandler) excludeArchive() {
+	var indexToRemove int
+	for index, section := range handler.sections {
+		if strings.Contains(strings.ToLower(section.Name), "архив") {
+			indexToRemove = index
+			break
+		}
+	}
 
+	handler.sections = append(handler.sections[:indexToRemove], handler.sections[indexToRemove+1:]...)
 }
 
 func (handler *SitemapHandler) fillSectionLinks(section *models.Section) error {
+	handler.logger.Info("Parsing section page:", section.Link)
 	sectionPage, err := handler.getStringifySourceBody(section.Link)
 	if err != nil {
 		return err
@@ -115,6 +126,7 @@ func (handler *SitemapHandler) fillSectionLinks(section *models.Section) error {
 }
 
 func (handler *SitemapHandler) fillCertAreaLinks(certArea *models.CertArea) error {
+	handler.logger.Info("Parsing cert area page:", certArea.Link)
 	certAreaPage, err := handler.getStringifySourceBody(certArea.Link)
 	if err != nil {
 		return err
@@ -136,6 +148,7 @@ func (handler *SitemapHandler) fillCertAreaLinks(certArea *models.CertArea) erro
 }
 
 func (handler *SitemapHandler) fillTestLinks(test *models.Test) error {
+	handler.logger.Info("Parsing tests page:", test.Link)
 	testPage, err := handler.getStringifySourceBody(test.Link)
 	if err != nil {
 		return err

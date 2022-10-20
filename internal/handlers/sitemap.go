@@ -50,7 +50,14 @@ func (handler *SitemapHandler) Handle(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// INSERT sections to database
+	// Before filling the tables old values should be removed
+	err = handler.sitemapRepository.TruncateAllSitemapTables()
+	if err != nil {
+		handler.logger.Error("Cannot truncate all sitemap tables: ", err.Error())
+		return
+	}
+
+	handler.sitemapRepository.CreateFilledSections(handler.sections)
 }
 
 func (handler *SitemapHandler) getStringifySourceBody(link models.Link) (string, error) {

@@ -3,3 +3,4 @@ vendor
 app.exe
 .vscode
 *.txt
+.idea

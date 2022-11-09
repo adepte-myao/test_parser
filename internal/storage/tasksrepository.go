@@ -14,12 +14,15 @@ func NewTaskRepository(store *Store) *TaskRepository {
 
 func (repo *TaskRepository) CreateTask(task models.Task, testId int) error {
 	var taskId int32
-	repo.store.db.QueryRow(
+	err := repo.store.db.QueryRow(
 		"INSERT INTO tasks (question, answer, test_id) VALUES ($1, $2, $3) RETURNING id",
 		task.Question,
 		task.Answer,
 		testId,
 	).Scan(&taskId)
+	if err != nil {
+		return err
+	}
 
 	for _, option := range task.Options {
 		repo.store.db.Exec(

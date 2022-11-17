@@ -4,4 +4,4 @@ server:
   link: "https://tests24.ru/"
 
 store:
-  database_url: "postgres://parser:superpass@db:5432/tests?sslmode=disable"
+  database_url: "postgres://postgres:pass@db_provider_tests:5432/tests?sslmode=disable"
